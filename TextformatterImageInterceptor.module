@@ -1,0 +1,299 @@
+<?php
+
+/**
+ * HTML Image Hijacker Textformatter
+ *
+ * Let editors use WYSIWYG images, but hijacks the image size/behaviour.
+ * 
+ * ProcessWire 2.x 
+ * Copyright (C) 2010 by Ryan Cramer 
+ * Licensed under GNU/GPL v2, see LICENSE.TXT
+ * 
+ * http://www.processwire.com
+ * http://www.ryancramer.com
+ *
+ */
+
+class TextformatterImageInterceptor extends Textformatter implements Module, ConfigurableModule {
+
+	protected static $defaultConfigData = array(
+	
+		// global
+		"inline-styles" => 1,
+		// "external-description" => 0, not used
+	
+		// Settings landscape Images
+		"landscape-percentage" => 100,
+		"landscape-width" => 600,
+		"landscape-align" => false,
+		"landscape-classes" => null,
+		"landscape-wrapper" => null,
+
+		// Settings portrait Images
+		"portrait-percentage" => 50,
+		"portrait-width" => 300,
+		"portrait-align" => false,
+		"portrait-classes" => null,
+		"portrait-wrapper" => null,
+		);
+
+
+	protected $data = array();
+
+	//protected static $defaultConfigData = $data;
+	public static function getModuleInfo() {
+		return array(
+			'title' => __("Image Interceptor", __FILE__),
+			'summary' => __("Let editors use WYSIWYG images, but change the image size/behaviour.", __FILE__),
+			'author' => 'Martijn Geerts',
+			'version' => 005, 
+			'autoload' => false, 
+		); 
+	}
+	
+	
+	/**
+	 * Cached String before output
+	 *
+	 */
+	 
+	//protected $data = array();
+	public $str = null;
+	Private $images = null;
+	Private $find = null;
+	Private $replace = null;
+
+ 	/**
+	 * Get data by key
+	 *
+	 */
+	public function __get($key) {
+		return isset($this->data[$key]) ? $this->data[$key] : null;
+	}
+
+
+	/**
+	 * Set the default data
+	 *
+	 */
+	public function __construct() {
+		foreach(self::$defaultConfigData as $key => $value) {
+			$this->data[$key] = $value; 
+		}
+	}
+
+    
+ 	/**
+	 * Set data at given key
+	 *
+	 */
+    public function __set($key, $value) {
+		$this->data[$key] = $value;
+	}
+
+	/**
+	 * Return the formatted string
+	 *
+	 */
+	public function format(&$str) {
+	
+		// set string to $this->str
+		$this->str = $str;
+		// returns null or array
+		$this->collectImageTags();
+		// No images found return given string.
+		if(!$this->images) return $this->str;
+		
+		$this->setFindReplace();
+		
+		$find = (array) $this->find;
+		$replace = (array) $this->replace;
+				
+		if( count($find) && ( count($find) === count($replace)) ) {
+			$str = str_replace($find, $replace, $str);
+		} else {
+			return $this->str;
+		}
+	}
+
+
+	/**
+	 * Push found images in array, stores in $this->original or returns null
+	 *
+	 * @return null|array
+ 	 */
+	private function collectImageTags() {
+		preg_match_all('/<img[^>]+>/i',$this->str, $images);
+		$this->images = count($images[0]) ? $images[0] : null;
+	}
+
+
+	public function setFindReplace() {
+	
+		$find = array();
+		$replace = array();
+		
+		$images = $this->images;
+		$fileLocation = wire("config")->urls->files;
+
+		foreach($images as $original) {
+								
+			// assumed that image is PW image
+			if(strpos($original, $fileLocation)) {
+			
+				preg_match_all( '/src="(.*?)"/i', $original, $array);
+				$src = $array[1][0]; // original				
+
+				preg_match_all( '/class="(.*?)"/i', $original, $array);
+				$processwire_align = strlen($array[1][0]) ? $array[1][0] : null; // original		
+				
+				//example:  1023/image-name.100x100.jpg
+				$string = str_replace($fileLocation, "", $src);
+				$array = explode("/", $string);
+								
+				// id of page where where image belongs to
+				$id = (int) $array[0];
+				// refering to to page where the image lives.
+				$page = wire("pages")->get($id);
+				// raw image variation name
+				$variationName = $array[1];
+				// basename of image.
+				$imageName = preg_replace("/\d+x\d+\./i","", $variationName);
+
+				$imageFields = $page->fields->find("type=FieldtypeImage");
+				foreach($imageFields as $imageField) {
+					$image = $page->$imageField->get($imageName);
+				}
+								
+				// skip this is we haven't a valid PW image.
+				if(!$image instanceof Pageimage) continue;
+				
+				$orientation = $this->getOrientation($image);
+				
+				// easy access data
+				$data = $this->data;
+				
+				$widthPercentage = (int) $data["{$orientation}-percentage"];
+				$widthPixel = (int) $data["{$orientation}-width"];
+				$wrapper = explode("||", $data["{$orientation}-wrapper"]);
+				$wrapper = count($wrapper) === 2 ? $wrapper : array(null,null);
+				$align = $data["{$orientation}-align"];
+				$align = ( $processwire_align && !strlen($align)) ? $processwire_align : $align;
+				$classes = trim($data["{$orientation}-classes"]) . " width_{$widthPercentage}" . " $align"; 
+				$classes = trim($classes); 
+				
+				// setting inline styles				
+				$align = explode("_", $align);
+				$align = in_array($align[1], array("left","right")) ? "float: {$align[1]}" : null;
+				$styles = $data["inline-styles"] ? "styles='width: {$widthPercentage}%; height: auto; {$align}'" : '';
+				
+				// create thumb
+				$thumb = $image->width($widthPixel);
+				
+				// adding to array
+				$find[] = $original;
+				$replace[] = "{$wrapper[0]}<img src='{$thumb->url}' alt='{$thumb->description}' class='{$classes}' $styles />{$wrapper[1]}";
+				
+			}		
+		}
+		
+		
+		if(count($find) && count($replace)) {
+			$this->find = $find;
+			$this->replace = $replace;
+		}
+	}	
+	
+	/**
+	 * Given a valid Pageimage, returns landscape of portrait string
+	 *
+	 * @return (string) landscape or landscape
+	 */
+	public function getOrientation($image) {
+		return $image->width() > $image->height() ? "landscape" : "portrait";
+	}
+
+
+	/**
+	 * Module settings
+	 *	
+ 	 */
+	public static function getModuleConfigInputfields(array $data) {
+
+		$modules = wire('modules');
+
+		foreach(self::$defaultConfigData as $key => $value) {
+			if(!isset($data[$key])) $data[$key] = $value; 
+		}
+		
+		// wrapper
+		$inputfields = new InputfieldWrapper();
+
+		$f = $modules->get('InputfieldCheckbox');
+		$f->name = "inline-styles";
+		$f->label = __("Inline styles");
+		$f->description = __("If checked, alignment and percentge width is set to the styles property of the image.");
+		$f->value = $data["inline-styles"];
+		$f->attr('checked', $data["inline-styles"] );
+		$inputfields->append($f);
+		
+		foreach(array("landscape","portrait") as $orientation ) {
+
+			$fs = $modules->get('InputfieldFieldset');
+			$fs->set("label", "Settings for $orientation images");
+			$fs->columnWidth = 50;
+
+			$f = $modules->get('InputfieldInteger');
+			$f->label = "Widths in percentage";
+			$f->name = "$orientation-percentage";
+			$f->value = $data[$orientation . '-percentage'];
+			$f->columnWidth = 33;
+			$f->required = 1;
+			$fs->append($f);
+	
+			$f = $modules->get('InputfieldInteger');
+			$f->label = "Width in Pixels";
+			$f->name = "$orientation-width";
+			$f->value = $data[$orientation . '-width'];
+			$f->columnWidth = 34;
+			$f->required = 1;
+			$fs->append($f);
+		
+			$f = $modules->get("InputfieldSelect");
+			$f->label = "Alignment";
+			$f->name = "$orientation-align";
+			$f->columnWidth = 33;
+			$f->addOptions(array(
+				'' => __("Inherit"),
+				'no_align' => __("Not Aligned"),
+				'align_left' => __("Left"),
+				'align_right' => __("Right"),
+				'align_center' => __("Center"),
+				));	
+			$f->attr("value", $data["$orientation-align"]);
+			$fs->append($f);
+
+			$f = $modules->get("InputfieldText");
+			$f->label = __("Class Names");
+			$f->name = "$orientation-classes";
+			$f->value = $data[$orientation . '-classes'];
+			$f->description = sprintf(__("These Classes will be added to %s images."), $orientation );
+			$f->notes = __("All images receives the ProcessWire align & width_x class by default.");
+			$f->pattern = "[\w \-]+";
+			$fs->append($f);
+
+			$f = $modules->get("InputfieldText");
+			$f->label = __("Image Wrapper");
+			$f->name = "$orientation-wrapper";
+			$f->value = $data[$orientation . '-wrapper'];
+			$f->description = sprintf(__("Wrap %s images with custom HTML."), $orientation);
+			$f->notes = __("example: <div class='$orientation image photo'>||</div>");
+			$fs->append($f);			
+			
+			$inputfields->append($fs);
+
+		}
+
+		return $inputfields;
+	}
+}
