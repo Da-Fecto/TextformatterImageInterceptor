@@ -22,7 +22,7 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 	 * Predefined settings for module settings
 	 *
 	 */
-
+	 
 	protected static $defaultConfigData = array(
 	
 		// global
@@ -44,32 +44,44 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 		"portrait-wrapper" => null,
 		);
 
+
+	/**
+	 * Required module information
+	 *
+	 */
+	 
 	public static function getModuleInfo() {
 		return array(
 			'title' => __("Image Interceptor", __FILE__),
 			'summary' => __("Let editors use WYSIWYG images, but change the image size/behaviour.", __FILE__),
 			'author' => 'Martijn Geerts',
-			'version' => 005, 
+			'version' => 006, 
 			'autoload' => false, 
 		); 
 	}
 	
 	
 	/**
-	 * Cached String before output
+	 * Cached strings / arrays
 	 *
 	 */
 	 
 	protected $data = array();
-	public $str = null;
-	Private $images = null;
-	Private $find = null;
-	Private $replace = null;
+	
+	// input & output of this module
+	public $str = null; 
+	// array with all found images
+	Private $images = null; 
+	// all images if the replacement image is present
+	Private $find = null; 
+	// replacement of the found images
+	Private $replace = null; 
 
 	/**
 	 * Set all settings to data
 	 *
 	 */
+	 
 	public function __construct() {
 		foreach(self::$defaultConfigData as $key => $value) {
 			$this->data[$key] = $value; 
@@ -80,6 +92,7 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 	 * Get data by key
 	 *
 	 */
+	 
 	public function __get($key) {
 		return isset($this->data[$key]) ? $this->data[$key] : null;
 	}
@@ -89,6 +102,7 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 	 * Set data at given key
 	 *
 	 */
+	 
     public function __set($key, $value) {
 		$this->data[$key] = $value;
 	}
@@ -97,6 +111,7 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 	 * Return the formatted string
 	 *
 	 */
+	 
 	public function format(&$str) {
 	
 		// set string to $this->str
@@ -126,11 +141,17 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 	 *
 	 * @return null|array
  	 */
+ 	 
 	private function collectImageTags() {
 		preg_match_all('/<img[^>]+>/i',$this->str, $images);
 		$this->images = count($images[0]) ? $images[0] : null;
 	}
 
+	/**
+	 * Push found images in array, stores in $this->original or returns null
+	 *
+	 * @return null|array
+ 	 */
 
 	public function setFindReplace() {
 	
@@ -167,6 +188,7 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 				$imageFields = $page->fields->find("type=FieldtypeImage");
 				foreach($imageFields as $imageField) {
 					$image = $page->$imageField->get($imageName);
+					if($image instanceof Pageimage) break;
 				}
 								
 				// skip this is we haven't a valid PW image.
@@ -212,27 +234,25 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 	 *
 	 * @return (string) landscape or landscape
 	 */
+	 
 	public function getOrientation($image) {
 		return $image->width() > $image->height() ? "landscape" : "portrait";
 	}
-
-
 
 
 	/**
 	 * Module settings
 	 *	
  	 */
+ 	 
 	public static function getModuleConfigInputfields(array $data) {
 
 		$modules = wire('modules');
+		$inputfields = new InputfieldWrapper();
 
 		foreach(self::$defaultConfigData as $key => $value) {
 			if(!isset($data[$key])) $data[$key] = $value; 
 		}
-		
-		// wrapper
-		$inputfields = new InputfieldWrapper();
 
 		$f = $modules->get('InputfieldCheckbox');
 		$f->name = "inline-styles";
