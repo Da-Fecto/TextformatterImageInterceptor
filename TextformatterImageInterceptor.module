@@ -1,9 +1,11 @@
 <?php
 
 /**
- * HTML Image Hijacker Textformatter
+ * HTML Image Interceptor Textformatter
  *
  * Let editors use WYSIWYG images, but let you control the image size/behaviour.
+ *
+ * @copyright 2013, Martijn Geerts
  * 
  * ProcessWire 2.x 
  * Copyright (C) 2010 by Ryan Cramer 
@@ -15,6 +17,11 @@
  */
 
 class TextformatterImageInterceptor extends Textformatter implements Module, ConfigurableModule {
+
+	/**
+	 * Predefined settings for module settings
+	 *
+	 */
 
 	protected static $defaultConfigData = array(
 	
@@ -37,10 +44,6 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 		"portrait-wrapper" => null,
 		);
 
-
-	protected $data = array();
-
-	//protected static $defaultConfigData = $data;
 	public static function getModuleInfo() {
 		return array(
 			'title' => __("Image Interceptor", __FILE__),
@@ -57,23 +60,14 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 	 *
 	 */
 	 
-	//protected $data = array();
+	protected $data = array();
 	public $str = null;
 	Private $images = null;
 	Private $find = null;
 	Private $replace = null;
 
- 	/**
-	 * Get data by key
-	 *
-	 */
-	public function __get($key) {
-		return isset($this->data[$key]) ? $this->data[$key] : null;
-	}
-
-
 	/**
-	 * Set the default data
+	 * Set all settings to data
 	 *
 	 */
 	public function __construct() {
@@ -82,7 +76,15 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 		}
 	}
 
-    
+  	/**
+	 * Get data by key
+	 *
+	 */
+	public function __get($key) {
+		return isset($this->data[$key]) ? $this->data[$key] : null;
+	}
+
+   
  	/**
 	 * Set data at given key
 	 *
@@ -101,15 +103,17 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 		$this->str = $str;
 		// returns null or array
 		$this->collectImageTags();
-		// No images found return given string.
+		// no images found return given string.
 		if(!$this->images) return $this->str;
 		
+		
+		// create find & rplace array & set (array) $this->find & (array) $this->replace
 		$this->setFindReplace();
 		
 		$find = (array) $this->find;
 		$replace = (array) $this->replace;
 				
-		if( count($find) && ( count($find) === count($replace)) ) {
+		if( count($find) > 0 && ( count($find) === count($replace)) ) {
 			$str = str_replace($find, $replace, $str);
 		} else {
 			return $this->str;
@@ -184,8 +188,8 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 				
 				// setting inline styles				
 				$align = explode("_", $align);
-				$align = in_array($align[1], array("left","right")) ? "float: {$align[1]}" : null;
-				$styles = $data["inline-styles"] ? "styles='width: {$widthPercentage}%; height: auto; {$align}'" : '';
+				$align = in_array($align[1], array("left","right")) ? "float: {$align[1]};" : null;
+				$styles = $data["inline-styles"] ? "style='width: {$widthPercentage}%; height: auto; {$align}'" : '';
 				
 				// create thumb
 				$thumb = $image->width($widthPixel);
@@ -193,7 +197,6 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 				// adding to array
 				$find[] = $original;
 				$replace[] = "{$wrapper[0]}<img src='{$thumb->url}' alt='{$thumb->description}' class='{$classes}' $styles />{$wrapper[1]}";
-				
 			}		
 		}
 		
@@ -212,6 +215,8 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 	public function getOrientation($image) {
 		return $image->width() > $image->height() ? "landscape" : "portrait";
 	}
+
+
 
 
 	/**
@@ -244,7 +249,7 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 			$fs->columnWidth = 50;
 
 			$f = $modules->get('InputfieldInteger');
-			$f->label = "Widths in percentage";
+			$f->label = "Percentage Width";
 			$f->name = "$orientation-percentage";
 			$f->value = $data[$orientation . '-percentage'];
 			$f->columnWidth = 33;
@@ -252,7 +257,7 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 			$fs->append($f);
 	
 			$f = $modules->get('InputfieldInteger');
-			$f->label = "Width in Pixels";
+			$f->label = "Pixel Width";
 			$f->name = "$orientation-width";
 			$f->value = $data[$orientation . '-width'];
 			$f->columnWidth = 34;
@@ -291,9 +296,7 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 			$fs->append($f);			
 			
 			$inputfields->append($fs);
-
 		}
-
 		return $inputfields;
 	}
 }
