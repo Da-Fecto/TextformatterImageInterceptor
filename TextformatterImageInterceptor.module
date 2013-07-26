@@ -61,7 +61,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 			'title' => __("Image Interceptor", __FILE__),
 			'summary' => __("Let editors use WYSIWYG images, but change the image size/behaviour.", __FILE__),
 			'author' => 'Martijn Geerts',
-			'version' => 006,
+			'version' => 085,
 			'autoload' => false,
 		);
 	}
