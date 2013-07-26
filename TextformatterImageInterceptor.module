@@ -6,35 +6,39 @@
  * Let editors use WYSIWYG images, but let you control the image size/behaviour.
  *
  * @copyright 2013, Martijn Geerts
- * 
- * ProcessWire 2.x 
- * Copyright (C) 2010 by Ryan Cramer 
+ *
+ * ProcessWire 2.x
+ * Copyright (C) 2010 by Ryan Cramer
  * Licensed under GNU/GPL v2, see LICENSE.TXT
- * 
+ *
  * http://www.processwire.com
  * http://www.ryancramer.com
  *
  */
 
-class TextformatterImageInterceptor extends Textformatter implements Module, ConfigurableModule {
+class TextformatterImageInterceptor extends Textformatter  implements  Module, ConfigurableModule {
 
 	/**
 	 * Predefined settings for module settings
 	 *
 	 */
-	 
+
 	protected static $defaultConfigData = array(
-	
+
 		// global
 		"inline-styles" => 1,
-		// "external-description" => 0, not used
-	
+		"fixed-size" => 1,
+		"high-density" => 1,
+		"tagged-sets" => "logo 10% 150px left 3:4",
+
 		// Settings landscape Images
 		"landscape-percentage" => 100,
 		"landscape-width" => 600,
 		"landscape-align" => false,
 		"landscape-classes" => null,
 		"landscape-wrapper" => null,
+		"landscape-styles" => null,
+		"landscape-aspect-ratio" => null,
 
 		// Settings portrait Images
 		"portrait-percentage" => 50,
@@ -42,6 +46,8 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 		"portrait-align" => false,
 		"portrait-classes" => null,
 		"portrait-wrapper" => null,
+		"portrait-styles" => null,
+		"portrait-aspect-ratio" => null,
 		);
 
 
@@ -49,42 +55,38 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 	 * Required module information
 	 *
 	 */
-	 
+
 	public static function getModuleInfo() {
 		return array(
 			'title' => __("Image Interceptor", __FILE__),
 			'summary' => __("Let editors use WYSIWYG images, but change the image size/behaviour.", __FILE__),
 			'author' => 'Martijn Geerts',
-			'version' => 006, 
-			'autoload' => false, 
-		); 
+			'version' => 006,
+			'autoload' => false,
+		);
 	}
-	
-	
+
+
 	/**
 	 * Cached strings / arrays
 	 *
 	 */
-	 
+
 	protected $data = array();
-	
-	// input & output of this module
-	public $str = null; 
-	// array with all found images
-	Private $images = null; 
-	// all images if the replacement image is present
-	Private $find = null; 
-	// replacement of the found images
-	Private $replace = null; 
+	public $str = null; // input & output of this module
+	Private $images = null; // array with all found images
+	Private $find = null; // all images if the $replace image is present
+	Private $replace = null; // replacement of the $find images
+	Private $taggedSets = null; // tagged sets
 
 	/**
 	 * Set all settings to data
 	 *
 	 */
-	 
+
 	public function __construct() {
 		foreach(self::$defaultConfigData as $key => $value) {
-			$this->data[$key] = $value; 
+			$this->data[$key] = $value;
 		}
 	}
 
@@ -92,17 +94,17 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 	 * Get data by key
 	 *
 	 */
-	 
+
 	public function __get($key) {
 		return isset($this->data[$key]) ? $this->data[$key] : null;
 	}
 
-   
+
  	/**
 	 * Set data at given key
 	 *
 	 */
-	 
+
     public function __set($key, $value) {
 		$this->data[$key] = $value;
 	}
@@ -111,38 +113,32 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 	 * Return the formatted string
 	 *
 	 */
-	 
+
 	public function format(&$str) {
-	
 		// set string to $this->str
 		$this->str = $str;
-		// returns null or array
-		$this->collectImageTags();
-		// no images found return given string.
-		if(!$this->images) return $this->str;
-		
-		
-		// create find & rplace array & set (array) $this->find & (array) $this->replace
+		// sets $this->images with image array or null if no raw images found.
+		$this->collectRawImages();
+		// if there are no raw images, give str unformatted back.
+		if(!$this->images) return $str;
+		// create find & replace arrays 
 		$this->setFindReplace();
-		
-		$find = (array) $this->find;
-		$replace = (array) $this->replace;
-				
-		if( count($find) > 0 && ( count($find) === count($replace)) ) {
-			$str = str_replace($find, $replace, $str);
-		} else {
-			return $this->str;
-		}
+		// get originals
+		$find = $this->find;
+		// replacements
+		$replace = $this->replace; 
+		// what should we give back ?
+		$str = count($replace) ? str_replace($find, $replace, $str) : $str;
+		return $str;
 	}
 
 
 	/**
-	 * Push found images in array, stores in $this->original or returns null
+	 * Push the found raw images in the $this->images array or set $this->images to null
 	 *
-	 * @return null|array
  	 */
- 	 
-	private function collectImageTags() {
+
+	private function collectRawImages() {
 		preg_match_all('/<img[^>]+>/i',$this->str, $images);
 		$this->images = count($images[0]) ? $images[0] : null;
 	}
@@ -151,31 +147,31 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 	 * Push found images in array, stores in $this->original or returns null
 	 *
 	 * @return null|array
+	 *
  	 */
 
 	public function setFindReplace() {
-	
+
 		$find = array();
 		$replace = array();
-		
+
 		$images = $this->images;
 		$fileLocation = wire("config")->urls->files;
 
 		foreach($images as $original) {
-								
-			// assumed that image is PW image
-			if(strpos($original, $fileLocation)) {
-			
-				preg_match_all( '/src="(.*?)"/i', $original, $array);
-				$src = $array[1][0]; // original				
 
+			// image stored in ProcessWire ?
+			if(strpos($original, $fileLocation)) {
+				// find raw src
+				preg_match_all( '/src="(.*?)"/i', $original, $array);
+				$src = $array[1][0]; // original
+				// ProcessWire alignment done with a class
 				preg_match_all( '/class="(.*?)"/i', $original, $array);
-				$processwire_align = strlen($array[1][0]) ? $array[1][0] : null; // original		
-				
-				//example:  1023/image-name.100x100.jpg
+				$pw_align = strlen($array[1][0]) ? $array[1][0] : null; // original
+				// example: 1023/image-name.100x100.jpg
 				$string = str_replace($fileLocation, "", $src);
+				// create array
 				$array = explode("/", $string);
-								
 				// id of page where where image belongs to
 				$id = (int) $array[0];
 				// refering to to page where the image lives.
@@ -184,138 +180,391 @@ class TextformatterImageInterceptor extends Textformatter implements Module, Con
 				$variationName = $array[1];
 				// basename of image.
 				$imageName = preg_replace("/\d+x\d+\./i","", $variationName);
-
+				// All image fields of the page
 				$imageFields = $page->fields->find("type=FieldtypeImage");
+				// find the image object
 				foreach($imageFields as $imageField) {
 					$image = $page->$imageField->get($imageName);
 					if($image instanceof Pageimage) break;
 				}
-								
 				// skip this is we haven't a valid PW image.
 				if(!$image instanceof Pageimage) continue;
 				
-				$orientation = $this->getOrientation($image);
+				/**
+				 * $image is now a valid ProcessWire image object.
+				 *
+				 */
 				
-				// easy access data
 				$data = $this->data;
-				
-				$widthPercentage = (int) $data["{$orientation}-percentage"];
-				$widthPixel = (int) $data["{$orientation}-width"];
-				$wrapper = explode("||", $data["{$orientation}-wrapper"]);
+				$orientation = $this->getOrientation($image);
+
+				/**
+				 * $this->processTags($image) returns null if there are no sets matching 
+				 * or else the matched tag of the image. The matched image tag is the key
+				 * for getting the image properties for $this->taggedSets['tag name'].
+				 * 
+				 */
+								
+				if($this->processTags($image)) {
+					$imageTag = $this->processTags($image);
+					$taggedSet = $this->taggedSets[$imageTag];
+					// properties
+					$percentage = (int) $taggedSet["percentage"];
+					$width = (int) $taggedSet["width"];
+					$align = isset($taggedSet["align"]) ? $taggedSet["align"] : "";
+					$ratio = $taggedSet["aspect-ratio"];
+					$wrapper = explode("||", $taggedSet["wrapper"]);
+					
+				} else {
+					// properties default settings
+					$imageTag = null;
+					$percentage = (int) $data["{$orientation}-percentage"];
+					$width = (int) $data["{$orientation}-width"];
+					$align = $data["{$orientation}-align"];					
+					$ratio = $data["{$orientation}-aspect-ratio"];
+					$wrapper = explode("||", $data["{$orientation}-wrapper"]);
+				}
+
+				// null or percentage
+				$highDensity = (int) $data["high-density"] && $percentage === 0 ? true : false;
+				$percentage = $percentage === 0 ? null : $percentage;
 				$wrapper = count($wrapper) === 2 ? $wrapper : array(null,null);
-				$align = $data["{$orientation}-align"];
-				$align = ( $processwire_align && !strlen($align)) ? $processwire_align : $align;
-				$classes = trim($data["{$orientation}-classes"]) . " width_{$widthPercentage}" . " $align"; 
-				$classes = trim($classes); 
+				$align = ( $pw_align && !strlen($align)) ? $pw_align : $align;
+				$align = str_replace("align_", "", $align); // only default images have align_ in front.
+				$ratio = strlen($ratio) ? $ratio : null;
+
+				/**
+				 * Build classes for the image
+				 *
+				 */
 				
-				// setting inline styles				
-				$align = explode("_", $align);
-				$align = in_array($align[1], array("left","right")) ? "float: {$align[1]};" : null;
-				$styles = $data["inline-styles"] ? "style='width: {$widthPercentage}%; height: auto; {$align}'" : '';
+				$classes = array();
+				$classes[] = $imageTag ? "image-tag " . $imageTag : "default" ;
+				$classes[] = $orientation ;
+				$classes[] = "align_" . $align;
+				$classes[] = $percentage ? "responsive p-" . $percentage  : "fixed-size";
+				$classes[] = $ratio ? "cropped crop-" . str_replace(":", "x", $ratio) : "no-crop";
+				$classes[] = $highDensity ? "high-density" : "";
 				
-				// create thumb
-				$thumb = $image->width($widthPixel);
+				$classes = "class='" . implode(" ", $classes ) . "'";
+				
+				// styles
+				$styles = null;
+				if($data["inline-styles"]) {
+					$styles = array();
+					if($percentage) {
+						$styles[] = "width: $percentage%;";
+						$styles[] = "height: auto;";
+					}
+					if(in_array($align, array("left","right"))) {
+						$styles[] = "float: $align;";
+					}					
+					if($align == "center") {
+						$styles[] = "margin-left: auto; margin-right: auto; display: block;";
+					}	
+
+				}
+				
+				$styles = $styles ? "style='" . implode(" ", $styles ) . "'" : "";
+				
+				/**
+				 * Recalculate image dimensions, honouring the width settings. And create
+				 * a thumbnail. For high density images double the image size.
+				 *
+				 */ 
+								
+				$imageWidth = $image->width;
+				$imageHeight = $image->height;
+
+				if($ratio) {
+					// set ratio to $w (width) and $h (height)
+					list($w, $h) = explode(":", $ratio);
+
+					if($w / $h > $imageWidth / $imageHeight) {
+						$imageHeight = $imageWidth * $h / $w;
+					} else {
+						$imageWidth = $imageHeight * $w / $h;
+					}
+					
+					if($imageWidth < $image->width) {						
+						$imageHeight = $image->width / $imageWidth * $image->height;
+						$imageWidth = $image->width;
+					}
+				}
+				
+				$proportion = $imageWidth / $width;
+				$attributeWidth = round($imageWidth / $proportion);
+				$attributeHeight = round($imageHeight / $proportion);
+				$imageWidth = $highDensity ? round(( $imageWidth / $proportion ) * 2 ) : $attributeWidth;
+				$imageHeight = $highDensity ? round(( $imageHeight / $proportion ) * 2 ) : $attributeHeight;
+				
+				$thumb = $image->size($imageWidth, $imageHeight);
+	
+				/**
+				 * Width & height attributes if the image is fixed sized
+				 *
+				 */ 
+	
+				$attributes = null;
+				if($percentage === null) {
+					$attributes = array();
+					$attributes[] = "width='$attributeWidth'";
+					$attributes[] = "height='$attributeHeight'";
+				}
+
+				$attributes = $attributes ? implode(" ", $attributes ) : "";
 				
 				// adding to array
 				$find[] = $original;
-				$replace[] = "{$wrapper[0]}<img src='{$thumb->url}' alt='{$thumb->description}' class='{$classes}' $styles />{$wrapper[1]}";
-			}		
+				$replace[] = "{$wrapper[0]}<img src='{$thumb->url}' $attributes $classes $styles alt='{$image->description}' />{$wrapper[1]}";
+			}
 		}
-		
-		
-		if(count($find) && count($replace)) {
+		if(count($replace)) {
 			$this->find = $find;
 			$this->replace = $replace;
 		}
-	}	
-	
+	}
+
 	/**
 	 * Given a valid Pageimage, returns landscape of portrait string
 	 *
 	 * @return (string) landscape or landscape
 	 */
-	 
+
 	public function getOrientation($image) {
 		return $image->width() > $image->height() ? "landscape" : "portrait";
 	}
 
 
 	/**
+	 * Find all tags of the image, loop through the tagged-sets and try to find where the
+	 * image tag(s) matches the first part of an individual set. The first matched set
+	 * explodes to an array and the array chunks are tested for valid image properties.
+	 * Valid properties are are stored in the taggedSets array (methode) and the tag name  
+	 * of the image is returned.
+	 *
+	 * note: Already found tagged sets will return the tag name imediately after a tagged
+	 * set is found.
+	 * 
+	 * @returns mixed ( null/string ) the image tag that matches the set
+	 *
+	 */
+
+	public function processTags($image) {
+
+		// no tags, nothing to do
+		$imageTags = trim($image->tags);
+		if(!strlen($imageTags)) return null;
+		// no presets, nothing to do
+		$taggedSets = trim($this->data['tagged-sets']);
+		if(!strlen($taggedSets)) return null;
+		// create arrays needed for looping
+		$imageTags = explode(" ", $imageTags);
+		$taggedSets = explode("\n", $taggedSets);
+	
+		// finding tagged sets		
+		foreach($taggedSets as $taggedSet) {
+			foreach($imageTags as $imageTag) {
+
+				// empty array for image properties, array get cached in $this->taggedSets 
+				$array = array();
+				
+				if(strpos($taggedSet, $imageTag) === 0) {				
+					
+					// if set is cached, don't need to process & return image tag
+					if(isset($this->taggedSets[$imageTag])) return $imageTag;
+					
+					// start finding properties
+					$taggedSetValues = explode(" ", trim($taggedSet));
+					$properties = array();
+					
+					foreach($taggedSetValues as $key => $value) {
+					
+						if($key === 0) continue; // image tags
+						
+						// procentual width
+						if(preg_match("/^[\d]{1,3}%$/", $value)) {
+							$properties['percentage'] = (int) $value;
+						}
+
+						// pixel width
+						if(preg_match("/^[\d]{1,4}px$/", $value)) {
+							if($value != 0) $properties['width'] = (int) $value;
+						}						
+
+						// Alignment
+						if(preg_match("/^left$|^center$|^right$|^no_align$/i", $value)) {
+							$properties['align'] = (string) $value;
+						}
+						// Aspect Ratio
+						if(preg_match("/^[\d]{1,2}:[\d]{1,2}$/", $value)) {
+							$properties['aspect-ratio'] = $value;
+						}												
+
+						// Wrapper
+						if(preg_match("/wrapper?[.\w-0-9]+/i", $value)) {
+							$wapper = explode(".", $value);
+							if(count($wapper)) {
+								foreach($wapper as $key => $value) {
+									if($key == 0) {
+										$class = "";
+										continue;
+									}
+									$class .= "$value ";
+								}
+								$value = "<div class='" . trim($class) . "'>||</div>";
+							}
+							$properties['wrapper'] = $value;
+						}												
+
+					}
+					
+					/**
+					 * Found properties put in an array with the tag name as key, then the
+					 * array is pushed to the taggedSets array. After this the tag name is
+					 * returned so we can pick it up in the setFindReplace methode.
+					 *
+					 */
+					
+					// without width we don't know how to size;			
+					if(isset($properties['width'])) {
+						$array[$imageTag] = $properties;
+						$this->taggedSets = $array;
+						return $imageTag;
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+
+	/**
 	 * Module settings
-	 *	
+	 *
  	 */
- 	 
+
 	public static function getModuleConfigInputfields(array $data) {
 
 		$modules = wire('modules');
+		$config = wire('config');
 		$inputfields = new InputfieldWrapper();
-
+		
 		foreach(self::$defaultConfigData as $key => $value) {
-			if(!isset($data[$key])) $data[$key] = $value; 
+			if(!isset($data[$key])) $data[$key] = $value;
 		}
+
+		$fieldset = $modules->get('InputfieldFieldset');
+		$fieldset->columnWidth = 50;
+		$fieldset->label = __("Global Settings");
 
 		$f = $modules->get('InputfieldCheckbox');
 		$f->name = "inline-styles";
-		$f->label = __("Inline styles");
-		$f->description = __("If checked, alignment and percentge width is set to the styles property of the image.");
+		$f->label = __("Render Inline styles");
+		$f->description = __("Append the style attribut to images.");
 		$f->value = $data["inline-styles"];
-		$f->attr('checked', $data["inline-styles"] );
+		$f->attr('checked', ( $data["inline-styles"] == 1) );
+		$fieldset->append($f);
+
+		$f = $modules->get('InputfieldCheckbox');
+		$f->name = "high-density";
+		$f->label = __("High Density");
+		$f->description = __("Automaticly double the pixel density on fixed sized images.");
+		$f->value = $data["high-density"];
+		$f->attr('checked', ($data["high-density"] == 1) );
+		$f->notes = __("Please leave the procentual width empty.");
+		$fieldset->append($f);
+
+		$inputfields->append($fieldset);
+
+		$f = $modules->get('InputfieldTextarea');
+		$f->columnWidth = 50;
+		$f->name = "tagged-sets";
+		$f->label = __("Tagged sets");
+		$f->rows = 5;
+		$description = 
+			__("Tagged sets are settings to apply to images that have a custom image tag. ") .
+			__("A tagged set starts with an image tag followed by it settings. ") . "\n\n" .
+			__("Every set on a new line. ") . "\n" .
+			__("Tag name and pixel width are required.") . "\n" .
+			__("Alignment values: left, center, right & no_align. Will inherit PW alignment if not set.") . "\n" .
+			__("Type \"wrapper.name-of-the-class.an-other-class\" to wrap the image.") . "\n";
+		$f->description = $description;
+		$f->value = $data["tagged-sets"];
+		$f->notes = __("example: logo 20% 125px left 3:4 wrapper.class-name");
+
 		$inputfields->append($f);
-		
+
 		foreach(array("landscape","portrait") as $orientation ) {
 
-			$fs = $modules->get('InputfieldFieldset');
-			$fs->set("label", "Settings for $orientation images");
-			$fs->columnWidth = 50;
+			$fieldset = $modules->get('InputfieldFieldset');
+			$fieldset->label = __("Settings for $orientation images");
+			$fieldset->columnWidth = 50;
 
 			$f = $modules->get('InputfieldInteger');
-			$f->label = "Percentage Width";
+			$f->label = "Percentage";
 			$f->name = "$orientation-percentage";
 			$f->value = $data[$orientation . '-percentage'];
-			$f->columnWidth = 33;
-			$f->required = 1;
-			$fs->append($f);
-	
+			$f->columnWidth = 25;
+			$fieldset->append($f);
+
 			$f = $modules->get('InputfieldInteger');
 			$f->label = "Pixel Width";
 			$f->name = "$orientation-width";
 			$f->value = $data[$orientation . '-width'];
-			$f->columnWidth = 34;
+			$f->columnWidth = 25;
 			$f->required = 1;
-			$fs->append($f);
-		
+			$fieldset->append($f);
+
 			$f = $modules->get("InputfieldSelect");
 			$f->label = "Alignment";
 			$f->name = "$orientation-align";
-			$f->columnWidth = 33;
+			$f->columnWidth = 25;
 			$f->addOptions(array(
 				'' => __("Inherit"),
 				'no_align' => __("Not Aligned"),
 				'align_left' => __("Left"),
 				'align_right' => __("Right"),
 				'align_center' => __("Center"),
-				));	
+				));
 			$f->attr("value", $data["$orientation-align"]);
-			$fs->append($f);
+			$fieldset->append($f);
+
+			$f = $modules->get('InputfieldText');
+			$f->label = "Aspect Ratio";
+			$f->name = "$orientation-aspect-ratio";
+			$f->value = $data[$orientation . '-aspect-ratio'];
+			$f->columnWidth = 25;
+			$f->notes = $orientation == "landscape" ? __("example: 16:9") : __("example: 3:4");
+			$f->pattern = "\d{1,2}:\d{1,2}";
+			$fieldset->append($f);
 
 			$f = $modules->get("InputfieldText");
-			$f->label = __("Class Names");
+			$f->label = sprintf(__("Class Names for %s images"), $orientation);
 			$f->name = "$orientation-classes";
 			$f->value = $data[$orientation . '-classes'];
 			$f->description = sprintf(__("These Classes will be added to %s images."), $orientation );
-			$f->notes = __("All images receives the ProcessWire align & width_x class by default.");
 			$f->pattern = "[\w \-]+";
-			$fs->append($f);
+			$fieldset->append($f);
 
 			$f = $modules->get("InputfieldText");
-			$f->label = __("Image Wrapper");
+			$f->label = sprintf(__("Image Wrapper for %s images"), $orientation);;
 			$f->name = "$orientation-wrapper";
 			$f->value = $data[$orientation . '-wrapper'];
-			$f->description = sprintf(__("Wrap %s images with custom HTML."), $orientation);
-			$f->notes = __("example: <div class='$orientation image photo'>||</div>");
-			$fs->append($f);			
-			
-			$inputfields->append($fs);
+			$f->pattern = "<.*[^>].*</.*>";
+			$f->notes = $orientation == "landscape" ? __("example: <div class='eight columns image photo'>||</div>") : __("example: <div class='five columns image photo'>||</div>");
+			$fieldset->append($f);
+
+			$f = $modules->get("InputfieldText");
+			$f->label = __("Additional Inline Styles");
+			$f->name = "$orientation-styles";
+			$f->value = $data[$orientation . '-styles'];
+			$f->description = sprintf(__("Append these styles to %s images. (If Render Inline styles is checked.)"), $orientation);
+			$f->pattern = "([\w-]+:[0-9\w .]+;\s?)+";
+			$f->notes = __("Only if render inline styles is checked.");
+			$fieldset->append($f);
+
+			$inputfields->append($fieldset);
 		}
 		return $inputfields;
 	}
