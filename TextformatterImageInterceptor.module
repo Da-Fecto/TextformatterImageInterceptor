@@ -29,7 +29,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		"inline-styles" => 1,
 		"fixed-size" => 1,
 		"high-density" => 1,
-		"tagged-sets" => "logo 10% 150px left 3:4",
+		"tagged-sets" => "logo 10% 150px left 3:4 wrapper.photo.image",
 
 		// Settings landscape Images
 		"landscape-percentage" => 100,
@@ -99,7 +99,6 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		return isset($this->data[$key]) ? $this->data[$key] : null;
 	}
 
-
  	/**
 	 * Set data at given key
 	 *
@@ -132,7 +131,6 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		return $str;
 	}
 
-
 	/**
 	 * Push the found raw images in the $this->images array or set $this->images to null
 	 *
@@ -144,9 +142,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 	}
 
 	/**
-	 * Push found images in array, stores in $this->original or returns null
-	 *
-	 * @return null|array
+	 * Building the find & replace array.
 	 *
  	 */
 
@@ -208,15 +204,14 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				if($this->processTags($image)) {
 					$imageTag = $this->processTags($image);
 					$taggedSet = $this->taggedSets[$imageTag];
-					// properties
+					// values for tagged sets
 					$percentage = (int) $taggedSet["percentage"];
 					$width = (int) $taggedSet["width"];
 					$align = isset($taggedSet["align"]) ? $taggedSet["align"] : "";
 					$ratio = $taggedSet["aspect-ratio"];
 					$wrapper = explode("||", $taggedSet["wrapper"]);
-					
 				} else {
-					// properties default settings
+					// values default settings
 					$imageTag = null;
 					$percentage = (int) $data["{$orientation}-percentage"];
 					$width = (int) $data["{$orientation}-width"];
@@ -225,7 +220,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 					$wrapper = explode("||", $data["{$orientation}-wrapper"]);
 				}
 
-				// null or percentage
+				// normalize some values
 				$highDensity = (int) $data["high-density"] && $percentage === 0 ? true : false;
 				$percentage = $percentage === 0 ? null : $percentage;
 				$wrapper = count($wrapper) === 2 ? $wrapper : array(null,null);
@@ -234,7 +229,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$ratio = strlen($ratio) ? $ratio : null;
 
 				/**
-				 * Build classes for the image
+				 * Build classes for the image.
 				 *
 				 */
 				
@@ -248,7 +243,11 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				
 				$classes = "class='" . implode(" ", $classes ) . "'";
 				
-				// styles
+				/**
+				 * Build inline styles for the image.
+				 *
+				 */
+				
 				$styles = null;
 				if($data["inline-styles"]) {
 					$styles = array();
