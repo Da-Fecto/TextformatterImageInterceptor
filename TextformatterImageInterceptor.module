@@ -534,7 +534,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 			__("Every set on a new line. ") . "\n" .
 			__("Tag name and pixel width are required.") . "\n" .
 			__("Alignment values: left, center, right & no_align. Will inherit PW alignment if not set.") . "\n" .
-			__("Type \"wrapper.name-of-the-class.an-other-class\" to wrap the image.") . "\n" . "\n" .
+			__("Type \"wrapper.name-of-the-class.an-other-class\" to wrap the image.") . "\n" .
 			__("Type \"caption.name-of-the-class.an-other-class\" to add an image caption.") . "\n";
 		$f->description = $description;
 		$f->value = $data["tagged-sets"];
