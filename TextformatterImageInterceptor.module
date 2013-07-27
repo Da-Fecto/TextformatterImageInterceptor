@@ -208,8 +208,8 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 					$ratio = $taggedSet["aspect-ratio"];
 					$wrapper = explode("||", $taggedSet["wrapper"]);
 				} else {
-					// values default settings
 					$imageTag = null;
+					// values default settings
 					$percentage = (int) $data["{$orientation}-percentage"];
 					$width = (int) $data["{$orientation}-width"];
 					$align = $data["{$orientation}-align"];					
@@ -222,7 +222,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$percentage = $percentage === 0 ? null : $percentage;
 				$wrapper = count($wrapper) === 2 ? $wrapper : array(null,null);
 				$align = ( $pw_align && !strlen($align)) ? $pw_align : $align;
-				$align = str_replace("align_", "", $align); // only default images have align_ in front.
+				$align = str_replace("align_", "", $align);
 				$ratio = strlen($ratio) ? $ratio : null;
 
 				/**
