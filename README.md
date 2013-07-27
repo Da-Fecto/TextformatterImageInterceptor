@@ -18,7 +18,7 @@ Let editors use WYSIWYG images, but let you control the image size, aspect ratio
 - **High Density**
 	- Double the pixel width of an image if the *percentage* is not set. *(fixed image size)*
 - **Image Captions**
-	- Type here your class name(s) for the caption. When a class name is provided and an image has a description, the image is wrapped (if not already) and *has-* is set in front of the class name(s). For the caption a div is created with the class name(s) and the image description.	 
+	- Type here your class name(s) for the caption. When a class name is provided and an image has a description, the image is wrapped (if not already) and *has-* is set in front of the class name(s). For the caption a div is created with the class name(s) and the image description as text.	 
 
 Default there are settings for landscape & portrait images. Squared images will inherit all settings belonging to portrait settings and there's a way to escape the default settings. 
 
