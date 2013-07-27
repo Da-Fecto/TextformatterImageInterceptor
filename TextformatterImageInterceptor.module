@@ -19,7 +19,7 @@
 class TextformatterImageInterceptor extends Textformatter  implements  Module, ConfigurableModule {
 
 	/**
-	 * Predefined settings for module settings
+	 * defaultConfigData for module settings
 	 *
 	 */
 
@@ -27,8 +27,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 
 		// global
 		"inline-styles" => 1,
-		"fixed-size" => 1,
-		"high-density" => 1,
+		"high-density" => 0,
 		"tagged-sets" => "logo 10% 150px left 3:4 wrapper.photo.image",
 
 		// Settings landscape Images
@@ -50,7 +49,6 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		"portrait-aspect-ratio" => null,
 		);
 
-
 	/**
 	 * Required module information
 	 *
@@ -61,18 +59,17 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 			'title' => __("Image Interceptor", __FILE__),
 			'summary' => __("Let editors use WYSIWYG images, but change the image size/behaviour.", __FILE__),
 			'author' => 'Martijn Geerts',
-			'version' => 085,
+			'version' => 85,
 			'autoload' => false,
 		);
 	}
 
-
 	/**
-	 * Cached strings / arrays
+	 * Variable caching & Settings
 	 *
 	 */
 
-	protected $data = array();
+	protected $data = array(); // module data
 	public $str = null; // input & output of this module
 	Private $images = null; // array with all found images
 	Private $find = null; // all images if the $replace image is present
@@ -229,44 +226,6 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$ratio = strlen($ratio) ? $ratio : null;
 
 				/**
-				 * Build classes for the image.
-				 *
-				 */
-				
-				$classes = array();
-				$classes[] = $imageTag ? "image-tag " . $imageTag : "default" ;
-				$classes[] = $orientation ;
-				$classes[] = "align_" . $align;
-				$classes[] = $percentage ? "responsive p-" . $percentage  : "fixed-size";
-				$classes[] = $ratio ? "cropped crop-" . str_replace(":", "x", $ratio) : "no-crop";
-				$classes[] = $highDensity ? "high-density" : "";
-				
-				$classes = "class='" . implode(" ", $classes ) . "'";
-				
-				/**
-				 * Build inline styles for the image.
-				 *
-				 */
-				
-				$styles = null;
-				if($data["inline-styles"]) {
-					$styles = array();
-					if($percentage) {
-						$styles[] = "width: $percentage%;";
-						$styles[] = "height: auto;";
-					}
-					if(in_array($align, array("left","right"))) {
-						$styles[] = "float: $align;";
-					}					
-					if($align == "center") {
-						$styles[] = "margin-left: auto; margin-right: auto; display: block;";
-					}	
-
-				}
-				
-				$styles = $styles ? "style='" . implode(" ", $styles ) . "'" : "";
-				
-				/**
 				 * Recalculate image dimensions, honouring the width settings. And create
 				 * a thumbnail. For high density images double the image size.
 				 *
@@ -298,7 +257,46 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$imageHeight = $highDensity ? round(( $imageHeight / $proportion ) * 2 ) : $attributeHeight;
 				
 				$thumb = $image->size($imageWidth, $imageHeight);
-	
+
+				/**
+				 * Build classes for the image.
+				 *
+				 */
+				
+				$classes = array();
+				$classes[] = $imageTag ? "image-tag " . $imageTag : "default" ;
+				$classes[] = $this->getOrientation($thumb);
+				$classes[] = strlen($align) ? "align_" . $align : "align_no_align";
+				$classes[] = $percentage ? "responsive p-" . $percentage  : "fixed-size";
+				$classes[] = $ratio ? "cropped crop-" . str_replace(":", "x", $ratio) : "no-crop";
+				$classes[] = $highDensity ? "high-density" : "";
+				$classes[] = $imageTag ? "" : $data["{$orientation}-classes"];
+				
+				$classes = "class='" . trim(implode(" ", $classes )) . "'";
+				
+				/**
+				 * Build inline styles for the image.
+				 *
+				 */
+				
+				$styles = null;
+				if($data["inline-styles"]) {
+					$styles = array();
+					if($percentage) {
+						$styles[] = "width: $percentage%;";
+						$styles[] = "height: auto;";
+					}
+					if(in_array($align, array("left","right"))) {
+						$styles[] = "float: $align;";
+					}					
+					if($align == "center") {
+						$styles[] = "margin-left: auto; margin-right: auto; display: block;";
+					}	
+					$styles[] = $data["{$orientation}-styles"];
+				}
+				
+				$styles = $styles ? "style='" . trim(implode(" ", $styles )) . "'" : "";
+					
 				/**
 				 * Width & height attributes if the image is fixed sized
 				 *
@@ -313,7 +311,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 
 				$attributes = $attributes ? implode(" ", $attributes ) : "";
 				
-				// adding to array
+				// push image strings to find & replace array
 				$find[] = $original;
 				$replace[] = "{$wrapper[0]}<img src='{$thumb->url}' $attributes $classes $styles alt='{$image->description}' />{$wrapper[1]}";
 			}
