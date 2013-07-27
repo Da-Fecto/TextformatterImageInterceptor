@@ -1,6 +1,6 @@
 #TextformatterImageInterceptor
 
-Let editors use WYSIWYG images, but let you control the image size/behaviour. 
+Let editors use WYSIWYG images, but let you control the image size, aspect ratio & behaviour. 
 
 ## How to install
 
