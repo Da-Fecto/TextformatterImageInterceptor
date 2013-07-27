@@ -29,7 +29,6 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		"inline-styles" => 1,
 		"high-density" => 0,
 		"tagged-sets" => "logo 10% 150px left 3:4 wrapper.photo.image",
-		"caption" => null,
 
 		// Settings landscape Images
 		"landscape-percentage" => 100,
@@ -39,6 +38,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		"landscape-wrapper" => null,
 		"landscape-styles" => null,
 		"landscape-aspect-ratio" => null,
+		"landscape-caption" => null,
 
 		// Settings portrait Images
 		"portrait-percentage" => 50,
@@ -48,6 +48,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		"portrait-wrapper" => null,
 		"portrait-styles" => null,
 		"portrait-aspect-ratio" => null,
+		"portrait-caption" => null,
 		);
 
 	/**
@@ -208,6 +209,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 					$align = isset($taggedSet["align"]) ? $taggedSet["align"] : "";
 					$ratio = $taggedSet["aspect-ratio"];
 					$wrapper = explode("||", $taggedSet["wrapper"]);
+					$caption = $taggedSet["caption"];
 				} else {
 					$imageTag = null;
 					// values default settings
@@ -216,13 +218,14 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 					$align = $data["{$orientation}-align"];					
 					$ratio = $data["{$orientation}-aspect-ratio"];
 					$wrapper = explode("||", $data["{$orientation}-wrapper"]);
+					$caption = $data["{$orientation}-caption"];
 				}
 
 				// normalize some values
 				$highDensity = (int) $data["high-density"] && $percentage === 0 ? true : false;
 				$percentage = $percentage === 0 ? null : $percentage;
 				$wrapper = count($wrapper) === 2 ? $wrapper : array(null,null);
-				$caption = strlen($data["caption"]) ? $data["caption"] : null;				
+				$caption = strlen($caption) ? $caption : null;				
 				$align = ( $pw_align && !strlen($align)) ? $pw_align : $align;
 				$align = str_replace("align_", "", $align);
 				$ratio = strlen($ratio) ? $ratio : null;
@@ -265,26 +268,27 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				 *
 				 */
 				 
-				$caption = null;
 				$captionClasses = "";
-				$array = explode(" ", trim($data["caption"]));
+				$array = explode(" ", trim($caption));
 				foreach($array as $value) $captionClasses .= "has-$value ";
 				$captionClasses = trim($captionClasses);		
 
 				// change or build a wrapper, wrapper is needed for a caption
-				if($wrapper[0] !== null && strlen($data["caption"]) && strlen($image->description)) {
+				if($wrapper[0] !== null && $caption && strlen($image->description)) {
 					if(strpos($wrapper[0], "class='")) {
 						$wrapper[0] = str_replace("class='","class='$captionClasses ", $wrapper[0] );
 					} else {
 						$wrapper[0] = str_replace("class=\"","class=\"$captionClasses ", $wrapper[0] );
 					}
-				} else if($wrapper[0] === null && strlen($data["caption"]) && strlen($image->description)) {				
+				} else if($wrapper[0] === null && $caption && strlen($image->description)) {				
 					$wrapper = array("<div class='" . $captionClasses . "'>","</div>");
 				}
 				
 				// build the caption
-				if(strlen($data["caption"]) && strlen($image->description)) {
+				if($caption && strlen($image->description)) {
 					$caption = "<div class='" . str_replace("has-", "", $captionClasses) . "'>{$image->description}</div>";
+				} else {
+					$caption = null;
 				}
 
 				/**
@@ -442,7 +446,23 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 							}
 							$properties['wrapper'] = $value;
 						}												
+						
+						// Image Caption
+						if(preg_match("/caption?[.\w-0-9]+/i", $value)) {
+							$caption = explode(".", $value);
+							if(count($caption)) {
+								foreach($caption as $key => $value) {
+									if($key == 0) {
+										$string = "";
+										continue;
+									}
+									$string .= "$value ";
+								}
+							}
+							$properties['caption'] = trim($string);
+						}												
 
+						
 					}
 					
 					/**
@@ -501,21 +521,13 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		$f->notes = __("Please leave the procentual width empty.");
 		$fieldset->append($f);
 
-		$f = $modules->get('InputfieldText');
-		$f->name = "caption";
-		$f->label = __("Image Caption");
-		$f->description = __("If an alt text is provided and a class name is entered here, an image caption is placed below the image.");
-		$f->value = $data["caption"];
-		$f->notes = __("example: caption alt-text");
-		$fieldset->append($f);
-
 		$inputfields->append($fieldset);
 
 		$f = $modules->get('InputfieldTextarea');
 		$f->columnWidth = 50;
 		$f->name = "tagged-sets";
 		$f->label = __("Tagged sets");
-		$f->rows = 7;
+		$f->rows = 4;
 		$description = 
 			__("Tagged sets are settings to apply to images that have a custom image tag. ") .
 			__("A tagged set starts with an image tag followed by it settings. ") . "\n\n" .
@@ -523,9 +535,10 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 			__("Tag name and pixel width are required.") . "\n" .
 			__("Alignment values: left, center, right & no_align. Will inherit PW alignment if not set.") . "\n" .
 			__("Type \"wrapper.name-of-the-class.an-other-class\" to wrap the image.") . "\n";
+			__("Type \"caption.name-of-the-class.an-other-class\" to add an image caption.") . "\n";
 		$f->description = $description;
 		$f->value = $data["tagged-sets"];
-		$f->notes = __("example: logo 20% 125px left 3:4 wrapper.class-name");
+		$f->notes = __("example: logo 20% 125px left 3:4 wrapper.class-name caption.class-name");
 
 		$inputfields->append($f);
 
@@ -596,6 +609,14 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 			$f->description = sprintf(__("Append these styles to %s images. (If Render Inline styles is checked.)"), $orientation);
 			$f->pattern = "([\w-]+:[0-9\w .]+;\s?)+";
 			$f->notes = __("Only if render inline styles is checked.");
+			$fieldset->append($f);
+
+			$f = $modules->get('InputfieldText');
+			$f->name = "$orientation-caption";
+			$f->label = __("Image Caption");
+			$f->description = __("If an alt text is provided and a class name is entered here, an image caption is placed below the image.");
+			$f->value =  $data[$orientation . "-caption"];
+			$f->notes = __("example: caption alt-text");
 			$fieldset->append($f);
 
 			$inputfields->append($fieldset);
