@@ -274,9 +274,9 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				// change or build a wrapper, wrapper is needed for a caption
 				if($wrapper[0] !== null && strlen($data["caption"]) && strlen($image->description)) {
 					if(strpos($wrapper[0], "class='")) {
-						$wrapper[0] = str_replace("class='","class='$captionClasses", $wrapper[0] );
+						$wrapper[0] = str_replace("class='","class='$captionClasses ", $wrapper[0] );
 					} else {
-						$wrapper[0] = str_replace("class=\"","class=\"$captionClasses", $wrapper[0] );
+						$wrapper[0] = str_replace("class=\"","class=\"$captionClasses ", $wrapper[0] );
 					}
 				} else if($wrapper[0] === null && strlen($data["caption"]) && strlen($image->description)) {				
 					$wrapper = array("<div class='" . $captionClasses . "'>","</div>");
