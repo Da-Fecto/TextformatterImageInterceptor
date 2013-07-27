@@ -29,6 +29,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		"inline-styles" => 1,
 		"high-density" => 0,
 		"tagged-sets" => "logo 10% 150px left 3:4 wrapper.photo.image",
+		"caption" => null,
 
 		// Settings landscape Images
 		"landscape-percentage" => 100,
@@ -221,6 +222,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$highDensity = (int) $data["high-density"] && $percentage === 0 ? true : false;
 				$percentage = $percentage === 0 ? null : $percentage;
 				$wrapper = count($wrapper) === 2 ? $wrapper : array(null,null);
+				$caption = strlen($data["caption"]) ? $data["caption"] : null;				
 				$align = ( $pw_align && !strlen($align)) ? $pw_align : $align;
 				$align = str_replace("align_", "", $align);
 				$ratio = strlen($ratio) ? $ratio : null;
@@ -257,6 +259,33 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$imageHeight = $highDensity ? round(( $imageHeight / $proportion ) * 2 ) : $attributeHeight;
 				
 				$thumb = $image->size($imageWidth, $imageHeight);
+
+				/**
+				 * Build caption for the image.
+				 *
+				 */
+				 
+				$caption = null;
+				$captionClasses = "";
+				$array = explode(" ", trim($data["caption"]));
+				foreach($array as $value) $captionClasses .= "has-$value ";
+				$captionClasses = trim($captionClasses);		
+
+				// change or build a wrapper, wrapper is needed for a caption
+				if($wrapper[0] !== null && strlen($data["caption"]) && strlen($image->description)) {
+					if(strpos($wrapper[0], "class='")) {
+						$wrapper[0] = str_replace("class='","class='$captionClasses", $wrapper[0] );
+					} else {
+						$wrapper[0] = str_replace("class=\"","class=\"$captionClasses", $wrapper[0] );
+					}
+				} else if($wrapper[0] === null && strlen($data["caption"]) && strlen($image->description)) {				
+					$wrapper = array("<div class='" . $captionClasses . "'>","</div>");
+				}
+				
+				// build the caption
+				if(strlen($data["caption"]) && strlen($image->description)) {
+					$caption = "<div class='" . str_replace("has-", "", $captionClasses) . "'>{$image->description}</div>";
+				}
 
 				/**
 				 * Build classes for the image.
@@ -313,7 +342,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				
 				// push image strings to find & replace array
 				$find[] = $original;
-				$replace[] = "{$wrapper[0]}<img src='{$thumb->url}' $attributes $classes $styles alt='{$image->description}' />{$wrapper[1]}";
+				$replace[] = "{$wrapper[0]}<img src='{$thumb->url}' $attributes $classes $styles alt='{$image->description}' />{$caption}{$wrapper[1]}";
 			}
 		}
 		if(count($replace)) {
@@ -472,13 +501,21 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		$f->notes = __("Please leave the procentual width empty.");
 		$fieldset->append($f);
 
+		$f = $modules->get('InputfieldText');
+		$f->name = "caption";
+		$f->label = __("Image Caption");
+		$f->description = __("If an alt text is provided and a class name is entered here, an image caption is placed below the image.");
+		$f->value = $data["caption"];
+		$f->notes = __("example: caption alt-text");
+		$fieldset->append($f);
+
 		$inputfields->append($fieldset);
 
 		$f = $modules->get('InputfieldTextarea');
 		$f->columnWidth = 50;
 		$f->name = "tagged-sets";
 		$f->label = __("Tagged sets");
-		$f->rows = 5;
+		$f->rows = 7;
 		$description = 
 			__("Tagged sets are settings to apply to images that have a custom image tag. ") .
 			__("A tagged set starts with an image tag followed by it settings. ") . "\n\n" .
@@ -548,7 +585,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 			$f->label = sprintf(__("Image Wrapper for %s images"), $orientation);;
 			$f->name = "$orientation-wrapper";
 			$f->value = $data[$orientation . '-wrapper'];
-			$f->pattern = "<.*[^>].*</.*>";
+			$f->pattern = "<.*class=('|\")[^>].*</.*>";
 			$f->notes = $orientation == "landscape" ? __("example: <div class='eight columns image photo'>||</div>") : __("example: <div class='five columns image photo'>||</div>");
 			$fieldset->append($f);
 
