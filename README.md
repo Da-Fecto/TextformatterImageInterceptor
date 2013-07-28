@@ -17,8 +17,7 @@ Let editors use WYSIWYG images, but let you control the image size, aspect ratio
 	- If checked, some inline styles are added to the image.
 - **High Density**
 	- Double the pixel width of an image if the *percentage* is not set. *(fixed image size)*
-- **Image Captions**
-	- Type here your class name(s) for the caption. When a class name is provided and an image has a description, the image is wrapped (if not already) and *has-* is set in front of the class name(s). For the caption a div is created with the class name(s) and the image description as text.	 
+	 
 
 Default there are settings for landscape & portrait images. Squared images will inherit all settings belonging to portrait settings and there's a way to escape the default settings. 
 
@@ -36,7 +35,12 @@ But before we dive deeper in *tagged sets* I want to spread some light on the la
 - **Aspect Ratio** (cropping)
 	- if an aspect ratio is given, the image will be cropped to the given ratio. If you type 2:1 in the landscape settings. Images 800 pixels wide, will be croped to a 800x400 image. The image gets the following classes: *.cropped* and *.crop-2x1*	
 
+- **Image Captions**
+	- Type here your class name(s) for the caption. When a class name is provided and an image has a description, the image is wrapped (if not already) and *has-* is set in front of the class name(s). For the caption a div is created with the class name(s) and the image description as text.
+
 Next to these settings. You can give custom classes to images. This way you can give it framework specific classes for example. And you're allowed to wrap the images with custom HTML. (Some frameworks needs additional HTML to make images more fancy) Then additional styles could be added to images if render inline styles is checked.
+
+Note: If you use a wrapper or captions (wrapper will be created if none is set), the inline styles and specific width & alignment classes will be set to the wrapper and removed from the image. This way no duplication of styles wil take place.
 
 ## Tagged sets
 
@@ -45,5 +49,10 @@ Tagged sets are an image tag followed by settings specific for images with that 
 To enable tagged sets, the image field need "Use Tags?" to be checked. Go to setup, then fields go to your image field and under the details tab check "Use Tags?". 
 
 Taged sets are a good way to escape the default image behaviour. Say you have a bunch of nicely ordered images on the page, but you want to show a company logo on 150px floated left. With tagged sets it's no problem. type: (logo 150px left) on one line and you've created your first set.
+
+If you want captions for a tagged set, keep in mind that captions need at least 1 class. The format to enter:
+*caption.class-name*. 
+
+For an image wrapper we use the same rules. The only difference is we start typing *wrapper* followed by class names starting with a dot. example: wrapper.logo.stand-out.
 
 You can have a multitude of sets, every set on it's own line. Every set needs at least a *tag-name* and a *pixel width*.

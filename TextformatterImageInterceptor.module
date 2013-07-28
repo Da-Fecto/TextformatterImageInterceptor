@@ -61,7 +61,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 			'title' => __("Image Interceptor", __FILE__),
 			'summary' => __("Let editors use WYSIWYG images, but you control the image size, behaviour and cropping.", __FILE__),
 			'author' => 'Martijn Geerts',
-			'version' => 85,
+			'version' => 90,
 			'autoload' => false,
 		);
 	}
@@ -295,7 +295,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$class = array();
 				$class[] = $imageTag ? "image-tag " . $imageTag : "default" ;
 				$class[] = $this->getOrientation($thumb);
-				if(strlen($align)) $class[] = "align_" . $align;
+				if(strlen($align)) $class["align"] = "align_" . $align;
 				$class["width"] = $percentage ? "responsive p-" . $percentage  : "fixed-size";
 				$class[] = $ratio ? "cropped crop-" . str_replace(":", "x", $ratio) : "no-crop";
 				$class[] = $highDensity ? "high-density" : "";
@@ -342,12 +342,19 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				// push image strings to find & replace array
 				$find[] = $original;
 				
-				// if there is a wrapper & there are inline styles, add those to the wrapper.
-				if(strlen($wrapper[0]) && strlen($styles)) {
-					$wrapper[0] = str_replace("class='", "class='{$class['width']} ", $wrapper[0]);
-					$wrapper[0] = str_replace("class", "$styles class", $wrapper[0]);
-					$styles = null; // don't need styles any more in the image. (don't double)
-					$classes = str_replace("{$class['width']} ", "", $classes);
+				// if there is a wrapper put width & alignment styles/classes to the wrapper.
+				if(strlen($wrapper[0])) {
+					$wrapper[0] = str_replace("class='", "class='{$class['width']} {$class['align']} ", $wrapper[0]);
+					if(strlen($styles)) {
+						$wrapper[0] = str_replace("class", "$styles class", $wrapper[0]);
+						$styles = null; // don't need styles any more in the image. (don't double)
+					}
+					$remove = array(
+						$class['width'] . " ",
+						$class['align'] . " "
+						);
+					
+					$classes = str_replace( $remove , "", $classes);
 				}
 				
 				$replace[] = "{$wrapper[0]}<img src='{$thumb->url}' $attributes $classes $styles alt='{$image->description}' />{$caption}{$wrapper[1]}";
