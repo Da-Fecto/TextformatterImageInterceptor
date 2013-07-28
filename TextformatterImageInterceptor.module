@@ -217,7 +217,8 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 					$width = (int) $data["{$orientation}-width"];
 					$align = $data["{$orientation}-align"];					
 					$ratio = $data["{$orientation}-aspect-ratio"];
-					$wrapper = explode("||", $data["{$orientation}-wrapper"]);
+					$wrapper = str_replace("\"", "'", $data["{$orientation}-wrapper"]);
+					$wrapper = explode("||", $wrapper);
 					$caption = $data["{$orientation}-caption"];
 				}
 
@@ -225,7 +226,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$highDensity = (int) $data["high-density"] && $percentage === 0 ? true : false;
 				$percentage = $percentage === 0 ? null : $percentage;
 				$wrapper = count($wrapper) === 2 ? $wrapper : array(null,null);
-				$caption = strlen($caption) ? $caption : null;				
+				$caption = strlen($caption) && strlen($image->description) ? trim($caption) : null;				
 				$align = ( $pw_align && !strlen($align)) ? $pw_align : $align;
 				$align = str_replace("align_", "", $align);
 				$ratio = strlen($ratio) ? $ratio : null;
@@ -267,45 +268,39 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				 * Build caption for the image.
 				 *
 				 */
-				 
-				$captionClasses = "";
-				$array = explode(" ", trim($caption));
-				foreach($array as $value) $captionClasses .= "has-$value ";
-				$captionClasses = trim($captionClasses);		
+				
+				if($caption) {
 
-				// change or build a wrapper, wrapper is needed for a caption
-				if($wrapper[0] !== null && $caption && strlen($image->description)) {
-					if(strpos($wrapper[0], "class='")) {
-						$wrapper[0] = str_replace("class='","class='$captionClasses ", $wrapper[0] );
-					} else {
-						$wrapper[0] = str_replace("class=\"","class=\"$captionClasses ", $wrapper[0] );
+					$hasClasses = "";
+					$array = explode(" ", $caption);
+					foreach($array as $value) $hasClasses .= "has-$value ";
+					$hasClasses = trim($hasClasses);
+
+					// change or build a caption wrapper.
+					if($wrapper[0] !== null ) {
+						$wrapper[0] = str_replace("class='","class='$hasClasses ", $wrapper[0]);	
+					} else if($wrapper[0] === null) {		
+						$wrapper = array("<div class='$hasClasses'>","</div>");
 					}
-				} else if($wrapper[0] === null && $caption && strlen($image->description)) {				
-					$wrapper = array("<div class='" . $captionClasses . "'>","</div>");
+	
+					// build the caption
+					$caption = $caption ? "<div class='$caption'>{$image->description}</div>" : null;
 				}
 				
-				// build the caption
-				if($caption && strlen($image->description)) {
-					$caption = "<div class='" . str_replace("has-", "", $captionClasses) . "'>{$image->description}</div>";
-				} else {
-					$caption = null;
-				}
-
 				/**
 				 * Build classes for the image.
 				 *
 				 */
 				
-				$classes = array();
-				$classes[] = $imageTag ? "image-tag " . $imageTag : "default" ;
-				$classes[] = $this->getOrientation($thumb);
-				$classes[] = strlen($align) ? "align_" . $align : "align_no_align";
-				$classes[] = $percentage ? "responsive p-" . $percentage  : "fixed-size";
-				$classes[] = $ratio ? "cropped crop-" . str_replace(":", "x", $ratio) : "no-crop";
-				$classes[] = $highDensity ? "high-density" : "";
-				$classes[] = $imageTag ? "" : $data["{$orientation}-classes"];
-				
-				$classes = "class='" . trim(implode(" ", $classes )) . "'";
+				$class = array();
+				$class[] = $imageTag ? "image-tag " . $imageTag : "default" ;
+				$class[] = $this->getOrientation($thumb);
+				if(strlen($align)) $class[] = "align_" . $align;
+				$class["width"] = $percentage ? "responsive p-" . $percentage  : "fixed-size";
+				$class[] = $ratio ? "cropped crop-" . str_replace(":", "x", $ratio) : "no-crop";
+				$class[] = $highDensity ? "high-density" : "";
+				$class[] = $imageTag ? "" : $data["{$orientation}-classes"];
+				$classes = "class='" . trim(implode(" ", $class )) . "'";
 				
 				/**
 				 * Build inline styles for the image.
@@ -328,7 +323,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 					$styles[] = $data["{$orientation}-styles"];
 				}
 				
-				$styles = $styles ? "style='" . trim(implode(" ", $styles )) . "'" : "";
+				$styles = $styles ? "style='" . trim(implode(" ", $styles )) . "'" : null;
 					
 				/**
 				 * Width & height attributes if the image is fixed sized
@@ -342,10 +337,19 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 					$attributes[] = "height='$attributeHeight'";
 				}
 
-				$attributes = $attributes ? implode(" ", $attributes ) : "";
+				$attributes = $attributes ? implode(" ", $attributes ) : null;
 				
 				// push image strings to find & replace array
 				$find[] = $original;
+				
+				// if there is a wrapper & there are inline styles, add those to the wrapper.
+				if(strlen($wrapper[0]) && strlen($styles)) {
+					$wrapper[0] = str_replace("class='", "class='{$class['width']} ", $wrapper[0]);
+					$wrapper[0] = str_replace("class", "$styles class", $wrapper[0]);
+					$styles = null; // don't need styles any more in the image. (don't double)
+					$classes = str_replace("{$class['width']} ", "", $classes);
+				}
+				
 				$replace[] = "{$wrapper[0]}<img src='{$thumb->url}' $attributes $classes $styles alt='{$image->description}' />{$caption}{$wrapper[1]}";
 			}
 		}
@@ -432,37 +436,21 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 						}												
 
 						// Wrapper
-						if(preg_match("/wrapper?[.\w-0-9]+/i", $value)) {
+						if(preg_match("/wrapper[.\w-0-9]+/i", $value)) {
+							$classes = "";
 							$wapper = explode(".", $value);
-							if(count($wapper)) {
-								foreach($wapper as $key => $value) {
-									if($key == 0) {
-										$class = "";
-										continue;
-									}
-									$class .= "$value ";
-								}
-								$value = "<div class='" . trim($class) . "'>||</div>";
-							}
-							$properties['wrapper'] = $value;
+							foreach($wapper as $value) $classes .= "$value ";
+							$classes = trim(substr($classes, 8));
+							$properties['wrapper'] = "<div class='$classes'>||</div>";
 						}												
 						
 						// Image Caption
-						if(preg_match("/caption?[.\w-0-9]+/i", $value)) {
+						if(preg_match("/caption[.\w-0-9]+/i", $value)) {
+							$classes = "";
 							$caption = explode(".", $value);
-							if(count($caption)) {
-								foreach($caption as $key => $value) {
-									if($key == 0) {
-										$string = "";
-										continue;
-									}
-									$string .= "$value ";
-								}
-							}
-							$properties['caption'] = trim($string);
-						}												
-
-						
+							foreach($caption as $value) $classes .= "$value ";
+							$properties['caption'] = substr($classes, 8);
+						}
 					}
 					
 					/**
