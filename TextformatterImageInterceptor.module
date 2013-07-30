@@ -16,6 +16,13 @@
  *
  */
 
+/**
+ * Todo:
+ *
+ * get alt text from original rte, with fallback to image.description.
+ *
+ */
+
 class TextformatterImageInterceptor extends Textformatter  implements  Module, ConfigurableModule {
 
 	/**
