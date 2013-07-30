@@ -170,16 +170,16 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				// id of page where where image belongs to
 				$id = (int) $array[0];
 				// refering to to page where the image lives.
-				$page = wire("pages")->get($id);
+				$p = wire("pages")->get($id);
 				// raw image variation name
 				$variationName = $array[1];
 				// basename of image.
 				$imageName = preg_replace("/\d+x\d+\./i","", $variationName);
 				// All image fields of the page
-				$imageFields = $page->fields->find("type=FieldtypeImage");
+				$imageFields = $p->fields->find("type=FieldtypeImage");
 				// find the image object
 				foreach($imageFields as $imageField) {
-					$image = $page->$imageField->get($imageName);
+					$image = $p->$imageField->get($imageName);
 					if($image instanceof Pageimage) break;
 				}
 				// skip this is we haven't a valid PW image.
