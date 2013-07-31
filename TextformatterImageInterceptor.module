@@ -509,7 +509,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		$f = $modules->get('InputfieldCheckbox');
 		$f->name = "inline-styles";
 		$f->label = __("Render Inline styles");
-		$f->description = __("Append the style attribut to images.");
+		$f->description = __("Append the style attribute to images.");
 		$f->value = $data["inline-styles"];
 		$f->attr('checked', ( $data["inline-styles"] == 1) );
 		$fieldset->append($f);
@@ -609,8 +609,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 			$f->name = "$orientation-styles";
 			$f->value = $data[$orientation . '-styles'];
 			$f->description = sprintf(__("Append these styles to %s images. (If Render Inline styles is checked.)"), $orientation);
-			$f->pattern = "([\w-]+:[0-9\w .]+;\s?)+";
-			$f->notes = __("Only if render inline styles is checked.");
+			$f->notes = __("border: 2px solid #FFF; margin: 1em;");
 			$fieldset->append($f);
 
 			$f = $modules->get('InputfieldText');
