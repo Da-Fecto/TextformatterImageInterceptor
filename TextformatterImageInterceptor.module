@@ -169,7 +169,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$src = $array[1][0]; // original
 				// ProcessWire alignment done with a class
 				preg_match_all( '/class="(.*?)"/i', $original, $array);
-				$pw_align = strlen($array[1][0]) ? $array[1][0] : null; // original
+				$pw_align = isset($array[1][0]) ? $array[1][0] : null; // original
 				// example: 1023/image-name.100x100.jpg
 				$string = str_replace($fileLocation, "", $src);
 				// create array
