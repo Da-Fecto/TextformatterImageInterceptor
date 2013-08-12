@@ -68,7 +68,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 			'title' => __("Image Interceptor", __FILE__),
 			'summary' => __("Let editors use WYSIWYG images, but you control the image size, behaviour and cropping.", __FILE__),
 			'author' => 'Martijn Geerts',
-			'version' => 91,
+			'version' => 92,
 			'autoload' => false,
 		);
 	}
@@ -184,11 +184,19 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$imageName = preg_replace("/\d+x\d+\./i","", $variationName);
 				// All image fields of the page
 				$imageFields = $p->fields->find("type=FieldtypeImage");
-				// find the image object
+				// find the image object				
 				foreach($imageFields as $imageField) {
-					$image = $p->$imageField->get($imageName);
-					if($image instanceof Pageimage) break;
+				    // if Maximum files allowed, just grab it.
+				    if($imageField->maxFiles == 1) {
+				        $image = $p->$imageField;
+				        break;
+				    // dealing with files array
+				    } else {
+					    $image = $p->$imageField->get("$imageName");
+					    if($image instanceof Pageimage) break;
+					}
 				}
+				
 				// skip this is we haven't a valid PW image.
 				if(!$image instanceof Pageimage) continue;
 				
