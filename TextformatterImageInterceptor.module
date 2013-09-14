@@ -35,6 +35,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		// global
 		"inline-styles" => 1,
 		"high-density" => 0,
+		"max-filesize" => 0,
 		"tagged-sets" => "logo 10% 150px left 3:4 wrapper.photo.image caption.image-caption",
 
 		// Settings landscape Images
@@ -126,12 +127,12 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		$this->collectRawImages();
 		// if there are no raw images, give str unformatted back.
 		if(!$this->images) return $str;
-		// create find & replace arrays 
+		// create find & replace arrays
 		$this->setFindReplace();
 		// get originals
 		$find = $this->find;
 		// replacements
-		$replace = $this->replace; 
+		$replace = $this->replace;
 		// what should we give back ?
 		$str = count($replace) ? str_replace($find, $replace, $str) : $str;
 		return $str;
@@ -184,7 +185,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$imageName = preg_replace("/\d+x\d+\./i","", $variationName);
 				// All image fields of the page
 				$imageFields = $p->fields->find("type=FieldtypeImage");
-				// find the image object				
+				// find the image object
 				foreach($imageFields as $imageField) {
 				    // if Maximum files allowed, just grab it.
 				    if($imageField->maxFiles == 1) {
@@ -196,25 +197,25 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 					    if($image instanceof Pageimage) break;
 					}
 				}
-				
+
 				// skip this is we haven't a valid PW image.
 				if(!$image instanceof Pageimage) continue;
-				
+
 				/**
 				 * $image is now a valid ProcessWire image object.
 				 *
 				 */
-				
+
 				$data = $this->data;
 				$orientation = $this->getOrientation($image);
 
 				/**
-				 * $this->processTags($image) returns null if there are no sets matching 
+				 * $this->processTags($image) returns null if there are no sets matching
 				 * or else the matched tag of the image. The matched image tag is the key
 				 * for getting the image properties for $this->taggedSets['tag name'].
-				 * 
+				 *
 				 */
-								
+
 				if($this->processTags($image)) {
 					$imageTag = $this->processTags($image);
 					$taggedSet = $this->taggedSets[$imageTag];
@@ -230,7 +231,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 					// values default settings
 					$percentage = (int) $data["{$orientation}-percentage"];
 					$width = (int) $data["{$orientation}-width"];
-					$align = $data["{$orientation}-align"];					
+					$align = $data["{$orientation}-align"];
 					$ratio = $data["{$orientation}-aspect-ratio"];
 					$wrapper = str_replace("\"", "'", $data["{$orientation}-wrapper"]);
 					$wrapper = explode("||", $wrapper);
@@ -239,19 +240,21 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 
 				// normalize some values
 				$highDensity = (int) $data["high-density"] && $percentage === 0 ? true : false;
+				$maxFilesize = (int) $data["max-filesize"] !== 0 ? (int) $data["max-filesize"] : false;
 				$percentage = $percentage === 0 ? null : $percentage;
 				$wrapper = count($wrapper) === 2 ? $wrapper : array(null,null);
-				$caption = strlen($caption) && strlen($image->description) ? trim($caption) : null;				
+				$caption = strlen($caption) && strlen($image->description) ? trim($caption) : null;
 				$align = ( $pw_align && !strlen($align)) ? $pw_align : $align;
 				$align = str_replace("align_", "", $align);
 				$ratio = strlen($ratio) ? $ratio : null;
+
 
 				/**
 				 * Recalculate image dimensions, honouring the width settings. And create
 				 * a thumbnail. For high density images double the image size.
 				 *
-				 */ 
-								
+				 */
+
 				$imageWidth = $image->width;
 				$imageHeight = $image->height;
 
@@ -264,26 +267,46 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 					} else {
 						$imageWidth = $imageHeight * $w / $h;
 					}
-					
-					if($imageWidth < $image->width) {						
+
+					if($imageWidth < $image->width) {
 						$imageHeight = $image->width / $imageWidth * $image->height;
 						$imageWidth = $image->width;
 					}
 				}
-				
+
 				$proportion = $imageWidth / $width;
 				$attributeWidth = round($imageWidth / $proportion);
 				$attributeHeight = round($imageHeight / $proportion);
 				$imageWidth = $highDensity ? round(( $imageWidth / $proportion ) * 2 ) : $attributeWidth;
 				$imageHeight = $highDensity ? round(( $imageHeight / $proportion ) * 2 ) : $attributeHeight;
-				
-				$thumb = $image->size($imageWidth, $imageHeight);
+
+				if($maxFilesize && $image->filesize > $maxFilesize){
+
+					$compressedPath = pathinfo($image->filename,PATHINFO_DIRNAME).'/'.pathinfo($image->filename,PATHINFO_FILENAME).'-'.$maxFilesize.'kb.'.pathinfo($image->filename,PATHINFO_EXTENSION);
+
+					if(!file_exists($compressedPath)){
+						$this->make_image_target_size($image->filename,pathinfo($image->filename,PATHINFO_DIRNAME),$maxFilesize);
+					}
+
+					$p->$imageField->add($compressedPath);
+
+					$compressedImage = $p->$imageField->last();
+
+					$thumb = $compressedImage->size($imageWidth, $imageHeight);
+
+				}
+				else{
+					$thumb = $image->size($imageWidth, $imageHeight);
+				}
+
+
+
 
 				/**
 				 * Build caption for the image.
 				 *
 				 */
-				
+
 				if($caption) {
 
 					$hasClasses = "";
@@ -293,20 +316,20 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 
 					// change or build a caption wrapper.
 					if($wrapper[0] !== null ) {
-						$wrapper[0] = str_replace("class='","class='$hasClasses ", $wrapper[0]);	
-					} else if($wrapper[0] === null) {		
+						$wrapper[0] = str_replace("class='","class='$hasClasses ", $wrapper[0]);
+					} else if($wrapper[0] === null) {
 						$wrapper = array("<div class='$hasClasses'>","</div>");
 					}
-	
+
 					// build the caption
 					$caption = $caption ? "<div class='$caption'>{$image->description}</div>" : null;
 				}
-				
+
 				/**
 				 * Build classes for the image.
 				 *
 				 */
-				
+
 				$class = array();
 				$class[] = $imageTag ? "image-tag " . $imageTag : "default" ;
 				$class[] = $this->getOrientation($thumb);
@@ -316,12 +339,12 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$class[] = $highDensity ? "high-density" : "";
 				$class[] = $imageTag ? "" : $data["{$orientation}-classes"];
 				$classes = "class='" . trim(implode(" ", $class )) . "'";
-				
+
 				/**
 				 * Build inline styles for the image.
 				 *
 				 */
-				
+
 				$styles = null;
 				if($data["inline-styles"]) {
 					$styles = array();
@@ -331,20 +354,20 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 					}
 					if(in_array($align, array("left","right"))) {
 						$styles[] = "float: $align;";
-					}					
+					}
 					if($align == "center") {
 						$styles[] = "margin-left: auto; margin-right: auto; display: block;";
-					}	
+					}
 					$styles[] = $data["{$orientation}-styles"];
 				}
-				
+
 				$styles = $styles ? "style='" . trim(implode(" ", $styles )) . "'" : null;
-					
+
 				/**
 				 * Width & height attributes if the image is fixed sized
 				 *
-				 */ 
-	
+				 */
+
 				$attributes = null;
 				if($percentage === null) {
 					$attributes = array();
@@ -353,10 +376,10 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				}
 
 				$attributes = $attributes ? implode(" ", $attributes ) : null;
-				
+
 				// push image strings to find & replace array
 				$find[] = $original;
-				
+
 				// if there is a wrapper put width & alignment styles/classes to the wrapper.
 				if(strlen($wrapper[0])) {
 					$wrapper[0] = str_replace("class='", "class='{$class['width']} {$class['align']} ", $wrapper[0]);
@@ -368,10 +391,10 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 						$class['width'] . " ",
 						$class['align'] . " "
 						);
-					
+
 					$classes = str_replace( $remove , "", $classes);
 				}
-				
+
 				$replace[] = "{$wrapper[0]}<img src='{$thumb->url}' $attributes $classes $styles alt='{$image->description}' />{$caption}{$wrapper[1]}";
 			}
 		}
@@ -396,12 +419,12 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 	 * Find all tags of the image, loop through the tagged-sets and try to find where the
 	 * image tag(s) matches the first part of an individual set. The first matched set
 	 * explodes to an array and the array chunks are tested for valid image properties.
-	 * Valid properties are are stored in the taggedSets array (methode) and the tag name  
+	 * Valid properties are are stored in the taggedSets array (methode) and the tag name
 	 * of the image is returned.
 	 *
 	 * note: Already found tagged sets will return the tag name imediately after a tagged
 	 * set is found.
-	 * 
+	 *
 	 * @returns mixed ( null/string ) the image tag that matches the set
 	 *
 	 */
@@ -417,27 +440,27 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		// create arrays needed for looping
 		$imageTags = explode(" ", $imageTags);
 		$taggedSets = explode("\n", $taggedSets);
-	
-		// finding tagged sets		
+
+		// finding tagged sets
 		foreach($taggedSets as $taggedSet) {
 			foreach($imageTags as $imageTag) {
 
-				// empty array for image properties, array get cached in $this->taggedSets 
+				// empty array for image properties, array get cached in $this->taggedSets
 				$array = array();
-				
-				if(strpos($taggedSet, $imageTag) === 0) {				
-					
+
+				if(strpos($taggedSet, $imageTag) === 0) {
+
 					// if set is cached, don't need to process & return image tag
 					if(isset($this->taggedSets[$imageTag])) return $imageTag;
-					
+
 					// start finding properties
 					$taggedSetValues = explode(" ", trim($taggedSet));
 					$properties = array();
-					
+
 					foreach($taggedSetValues as $key => $value) {
-					
+
 						if($key === 0) continue; // image tags
-						
+
 						// procentual width
 						if(preg_match("/^[\d]{1,3}%$/", $value)) {
 							$properties['percentage'] = (int) $value;
@@ -446,7 +469,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 						// pixel width
 						if(preg_match("/^[\d]{1,4}px$/", $value)) {
 							if($value != 0) $properties['width'] = (int) $value;
-						}						
+						}
 
 						// Alignment
 						if(preg_match("/^left$|^center$|^right$|^no_align$/i", $value)) {
@@ -455,7 +478,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 						// Aspect Ratio
 						if(preg_match("/^[\d]{1,2}:[\d]{1,2}$/", $value)) {
 							$properties['aspect-ratio'] = $value;
-						}												
+						}
 
 						// Wrapper
 						if(preg_match("/wrapper[.\w-0-9]+/i", $value)) {
@@ -464,8 +487,8 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 							foreach($wapper as $value) $classes .= "$value ";
 							$classes = trim(substr($classes, 8));
 							$properties['wrapper'] = "<div class='$classes'>||</div>";
-						}												
-						
+						}
+
 						// Image Caption
 						if(preg_match("/caption[.\w-0-9]+/i", $value)) {
 							$classes = "";
@@ -474,15 +497,15 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 							$properties['caption'] = substr($classes, 8);
 						}
 					}
-					
+
 					/**
 					 * Found properties put in an array with the tag name as key, then the
 					 * array is pushed to the taggedSets array. After this the tag name is
 					 * returned so we can pick it up in the setFindReplace methode.
 					 *
 					 */
-					
-					// without width we don't know how to size;			
+
+					// without width we don't know how to size;
 					if(isset($properties['width'])) {
 						$array[$imageTag] = $properties;
 						$this->taggedSets = $array;
@@ -496,6 +519,51 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 
 
 	/**
+	 * Resize images that exceed the max filesize setting
+	 *
+	 */
+	public function make_image_target_size($file,$saveDir,$targetKB){
+	    $imageInfo = getimagesize($file);
+	    $tmp = explode('.',basename($file));
+	    $filename = array_shift($tmp);
+	    switch($imageInfo['mime']){
+	        case 'image/jpeg':
+	            $src = imagecreatefromjpeg($file);
+	            break;
+	        case 'image/gif':
+	            $src = imagecreatefromgif($file);
+	            break;
+	        case 'image/png':
+	            $src = imagecreatefrompng($file);
+	            break;
+	    }
+	    $target = $targetKB*1024;
+	    $start_q = 1;
+	    $cur_q = 99;
+	    while($cur_q > $start_q){
+	        $temp_file = tempnam(sys_get_temp_dir(), 'checksizer');
+	        $out = imagejpeg($src, $temp_file, $cur_q);
+	        $size = filesize($temp_file);
+	        if($size <= $target){
+	            $s = $targetKB.'kb';
+	            $saveAs = str_replace("//","/",$saveDir.'/'.$filename.'-'.$s.'.jpg');
+	            copy($temp_file, $saveAs);
+	            unlink($temp_file);
+	            $cur_q=0;
+	        }
+	        $cur_q=$cur_q-1;
+	    }
+	    if($saveAs == ''){
+	        return false;
+	    }else{
+	        return $saveAs;
+	    }
+	}
+
+
+
+
+	/**
 	 * Module settings
 	 *
  	 */
@@ -505,7 +573,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		$modules = wire('modules');
 		$config = wire('config');
 		$inputfields = new InputfieldWrapper();
-		
+
 		foreach(self::$defaultConfigData as $key => $value) {
 			if(!isset($data[$key])) $data[$key] = $value;
 		}
@@ -531,6 +599,14 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		$f->notes = __("Please leave the procentual width empty.");
 		$fieldset->append($f);
 
+		$f = $modules->get('InputfieldText');
+		$f->name = "max-filesize";
+		$f->label = __("Max Filesize");
+		$f->description = __("Automatically reduce the image to this filesize if the original exceeds it.");
+		$f->notes = __("Enter in KB. Leave as 0 for no max.");
+		$f->value = $data["max-filesize"];
+		$fieldset->append($f);
+
 		$inputfields->append($fieldset);
 
 		$f = $modules->get('InputfieldTextarea');
@@ -538,7 +614,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		$f->name = "tagged-sets";
 		$f->label = __("Tagged sets");
 		$f->rows = 4;
-		$description = 
+		$description =
 			__("Tagged sets are settings to apply to images that have a custom image tag. ") .
 			__("A tagged set starts with an image tag followed by it settings. ") . "\n\n" .
 			__("Every set on a new line. ") . "\n" .
