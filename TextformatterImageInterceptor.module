@@ -190,7 +190,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				    // if Maximum files allowed, just grab it.
 				    if($imageField->maxFiles == 1) {
 				        $image = $p->$imageField;
-				        break;
+				        if($image instanceof Pageimage) break;
 				    // dealing with files array
 				    } else {
 					    $image = $p->$imageField->get("$imageName");
