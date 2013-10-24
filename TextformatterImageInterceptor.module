@@ -184,18 +184,17 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				// basename of image.
 				$imageName = preg_replace("/\d+x\d+\./i","", $variationName);
 				// All image fields of the page
-				$imageFields = $p->fields->find("type=FieldtypeImage");
+				$imageFields = $p->fields->find("type=FieldtypeImage|FieldtypeCropImage");
 				// find the image object
 				foreach($imageFields as $imageField) {
 				    // if Maximum files allowed, just grab it.
 				    if($imageField->maxFiles == 1) {
 				        $image = $p->$imageField;
-				        if($image instanceof Pageimage) break;
 				    // dealing with files array
 				    } else {
-					    $image = $p->$imageField->get("$imageName");
-					    if($image instanceof Pageimage) break;
-					}
+				        $image = $p->$imageField->get("$imageName");
+				    }
+                                    if($image instanceof Pageimage) break;				    
 				}
 
 				// skip this is we haven't a valid PW image.
@@ -406,7 +405,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 
 	/**
 	 * Given a valid Pageimage, returns landscape of portrait string
-	 *
+	 *ty
 	 * @return (string) landscape or landscape
 	 */
 
