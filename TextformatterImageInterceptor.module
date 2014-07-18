@@ -35,6 +35,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		// global
 		"inline-styles" => 1,
 		"high-density" => 0,
+		"lazy-load" => 0,
 		"max-filesize" => 0,
 		"tagged-sets" => "logo 10% 150px left 3:4 wrapper.photo.image caption.image-caption",
 
@@ -69,7 +70,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 			'title' => __("Image Interceptor", __FILE__),
 			'summary' => __("Let editors use WYSIWYG images, but you control the image size, behaviour and cropping.", __FILE__),
 			'author' => 'Martijn Geerts',
-			'version' => 95,
+			'version' => 96,
 			'autoload' => false,
 		);
 	}
@@ -239,6 +240,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 
 				// normalize some values
 				$highDensity = (int) $data["high-density"] && $percentage === 0 ? true : false;
+				$lazyLoad = (int) $data["lazy-load"] ? true : false;
 				$maxFilesize = (int) $data["max-filesize"] !== 0 ? (int) $data["max-filesize"] : false;
 				$percentage = $percentage === 0 ? null : $percentage;
 				$wrapper = count($wrapper) === 2 ? $wrapper : array(null,null);
@@ -336,6 +338,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 				$class["width"] = $percentage ? "responsive p-" . $percentage  : "fixed-size";
 				$class[] = $ratio ? "cropped crop-" . str_replace(":", "x", $ratio) : "no-crop";
 				$class[] = $highDensity ? "high-density" : "";
+				$class[] = $lazyLoad ? "lazy" : "";
 				$class[] = $imageTag ? "" : $data["{$orientation}-classes"];
 				$classes = "class='" . trim(implode(" ", $class )) . "'";
 
@@ -394,7 +397,10 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 					$classes = str_replace( $remove , "", $classes);
 				}
 
-				$replace[] = "{$wrapper[0]}<img src='{$thumb->url}' $attributes $classes $styles alt='{$image->description}' />{$caption}{$wrapper[1]}";
+				// use data-original attribute to store src if lazyLoad option checked
+				$src = $lazyLoad ? "data-original='{$thumb->url}'" : "src='{$thumb->url}'";
+
+				$replace[] = "{$wrapper[0]}<img {$src} $attributes $classes $styles alt='{$image->description}' />{$caption}{$wrapper[1]}";
 			}
 		}
 		if(count($replace)) {
@@ -578,7 +584,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		}
 
 		$fieldset = $modules->get('InputfieldFieldset');
-		$fieldset->columnWidth = 50;
+		$fieldset->columnWidth = 100;
 		$fieldset->label = __("Global Settings");
 
 		$f = $modules->get('InputfieldCheckbox');
@@ -587,6 +593,8 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		$f->description = __("Append the style attribute to images.");
 		$f->value = $data["inline-styles"];
 		$f->attr('checked', ( $data["inline-styles"] == 1) );
+		$f->columnWidth = 25;
+
 		$fieldset->append($f);
 
 		$f = $modules->get('InputfieldCheckbox');
@@ -596,6 +604,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		$f->value = $data["high-density"];
 		$f->attr('checked', ($data["high-density"] == 1) );
 		$f->notes = __("Please leave the procentual width empty.");
+		$f->columnWidth = 25;
 		$fieldset->append($f);
 
 		$f = $modules->get('InputfieldText');
@@ -604,12 +613,23 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 		$f->description = __("Automatically reduce the image to this filesize if the original exceeds it.");
 		$f->notes = __("Enter in KB. Leave as 0 for no max.");
 		$f->value = $data["max-filesize"];
+		$f->columnWidth = 25;
+		$fieldset->append($f);
+
+		$f = $modules->get('InputfieldCheckbox');
+		$f->name = "lazy-load";
+		$f->label = __("Use Lazy Loading markup?");
+		$f->description = __("Will use jQuery Lazy Load compatible markup");
+		$f->notes = __("Make sure you have jQuery Lazy Load plugin installed and initialized otherwise images will not display");
+		$f->value = $data["lazy-load"];
+		$f->attr('checked', ($data["lazy-load"] == 1) );
+		$f->columnWidth = 25;
 		$fieldset->append($f);
 
 		$inputfields->append($fieldset);
 
 		$f = $modules->get('InputfieldTextarea');
-		$f->columnWidth = 50;
+		$f->columnWidth = 100;
 		$f->name = "tagged-sets";
 		$f->label = __("Tagged sets");
 		$f->rows = 4;
