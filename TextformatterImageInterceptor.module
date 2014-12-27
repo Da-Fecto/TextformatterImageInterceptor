@@ -69,7 +69,7 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
             'title' => __("Image Interceptor", __FILE__),
             'summary' => __("Let editors use WYSIWYG images, but you control the image size, behaviour and cropping.", __FILE__),
             'author' => 'Martijn Geerts',
-            'version' => 98,
+            'version' => 99,
             'autoload' => false,
         );
     }
@@ -378,7 +378,8 @@ class TextformatterImageInterceptor extends Textformatter  implements  Module, C
 
                 // if there is a wrapper put width & alignment styles/classes to the wrapper.
                 if(strlen($wrapper[0])) {
-                    $wrapper[0] = str_replace("class='", "class='{$class['width']} {$class['align']} ", $wrapper[0]);
+                    $align = isset($class['align']) ? $class['align'] : '';
+                    $wrapper[0] = str_replace("class='", "class='{$class['width']} {$align} ", $wrapper[0]);
                     if(strlen($styles)) {
                         $wrapper[0] = str_replace("class", "$styles class", $wrapper[0]);
                         $styles = null; // don't need styles any more in the image. (don't double)
